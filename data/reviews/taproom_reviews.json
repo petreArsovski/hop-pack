@@ -1,0 +1,8 @@
+[
+  {"review_id": "r1", "customer_id": 1, "beer_id": 101, "rating": 5, "review_text": "Piney and clean.", "review_date": "2026-09-01"},
+  {"review_id": "r2", "customer_id": 2, "beer_id": 102, "rating": 4, "review_text": "Dessert in a glass.", "review_date": "2026-09-02"},
+  {"review_id": "r3", "customer_id": 3, "beer_id": 104, "rating": 5, "review_text": "Tart cherry, not candy.", "review_date": "2026-09-03"},
+  {"review_id": "r4", "customer_id": 4, "beer_id": 105, "rating": 3, "review_text": "Fine, a bit cloudy.", "review_date": "2026-09-04"},
+  {"review_id": "r5", "customer_id": 5, "beer_id": 106, "rating": 2, "review_text": "Too bitter for me.", "review_date": "2026-09-05"},
+  {"review_id": "r6", "customer_id": 1, "beer_id": 108, "rating": 4, "review_text": "Crisp after a shift.", "review_date": "2026-09-06"}
+]

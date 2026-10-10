@@ -1,0 +1,146 @@
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: hop-mssql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "HopBarrel1!"
+      MSSQL_PID: Developer
+    ports:
+      - "14333:1433"
+    volumes:
+      - hop_mssql_data:/var/opt/mssql
+      - ./sql/source:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "(/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'HopBarrel1!' -C -Q 'SELECT 1' -b -o /dev/null) || (/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'HopBarrel1!' -C -Q 'SELECT 1' -b -o /dev/null) || exit 1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  mssql-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: hop-mssql-init
+    depends_on:
+      mssql:
+        condition: service_healthy
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "HopBarrel1!"
+      MSSQL_HOST: mssql
+      SQL_DIR: /docker-entrypoint-initdb.d
+    volumes:
+      - ./sql/source:/docker-entrypoint-initdb.d:ro
+      - ./scripts/init-mssql.sh:/init-mssql.sh:ro
+    entrypoint: ["/bin/bash", "/init-mssql.sh"]
+    restart: "no"
+
+  postgres:
+    image: postgres:16
+    container_name: hop-postgres
+    environment:
+      POSTGRES_USER: warehouse
+      POSTGRES_PASSWORD: warehouse
+      POSTGRES_DB: hop_warehouse
+    ports:
+      - "5433:5432"
+    volumes:
+      - hop_pg_data:/var/lib/postgresql/data
+      - ./sql/warehouse/00_init.sql:/docker-entrypoint-initdb.d/00_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warehouse -d hop_warehouse"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hop-pipeline
+    depends_on:
+      mssql:
+        condition: service_healthy
+      mssql-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    environment:
+      MSSQL_HOST: mssql
+      MSSQL_PORT: "1433"
+      MSSQL_USER: sa
+      MSSQL_PASSWORD: HopBarrel1!
+      PG_HOST: postgres
+      PG_PORT: "5432"
+      PG_USER: warehouse
+      PG_PASSWORD: warehouse
+      PG_DATABASE: hop_warehouse
+      LANDING_DIR: /app/landing
+    volumes:
+      - ./:/app
+    working_dir: /app
+    profiles: ["run"]
+    command: ["python", "-m", "ingest.run_pipeline"]
+
+  airflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
+    container_name: hop-airflow
+    depends_on:
+      mssql:
+        condition: service_healthy
+      mssql-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    environment:
+      MSSQL_HOST: mssql
+      MSSQL_PORT: "1433"
+      MSSQL_USER: sa
+      MSSQL_PASSWORD: HopBarrel1!
+      PG_HOST: postgres
+      PG_PORT: "5432"
+      PG_USER: warehouse
+      PG_PASSWORD: warehouse
+      PG_DATABASE: hop_warehouse
+      LANDING_DIR: /opt/airflow/landing
+      AIRFLOW_HOME: /opt/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./ingest:/opt/airflow/ingest
+      - ./sql:/opt/airflow/sql
+      - ./config:/opt/airflow/config
+      - ./data:/opt/airflow/data
+      - ./landing:/opt/airflow/landing
+    ports:
+      - "8085:8080"
+    profiles: ["airflow"]
+    command:
+      - bash
+      - -c
+      - |
+        airflow db migrate
+        airflow users create --username admin --password admin --firstname Hop --lastname Barrel --role Admin --email admin@example.com || true
+        airflow scheduler &
+        exec airflow webserver --port 8080
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 50s
+
+volumes:
+  hop_mssql_data:
+  hop_pg_data:

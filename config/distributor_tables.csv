@@ -1,0 +1,3 @@
+database,tablename,load_type,watermark,is_active,target_path
+hop_distributors,distributors,full,,1,landing/distributors/distributors
+hop_distributors,beer_distributors,incremental,last_updated,1,landing/distributors/beer_distributors

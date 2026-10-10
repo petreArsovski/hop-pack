@@ -1,0 +1,6 @@
+database,tablename,load_type,watermark,is_active,target_path
+hop_and_barrel,styles,full,,1,landing/shop/styles
+hop_and_barrel,beers,full,,1,landing/shop/beers
+hop_and_barrel,customers,incremental,updated_at,1,landing/shop/customers
+hop_and_barrel,orders,incremental,updated_at,1,landing/shop/orders
+hop_and_barrel,order_items,incremental,updated_at,1,landing/shop/order_items

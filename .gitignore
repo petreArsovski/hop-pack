@@ -1,0 +1,9 @@
+hop-and-barrel-pipeline.zip
+__pycache__/
+*.pyc
+.venv/
+landing/**/*.json
+!landing/.gitkeep
+.DS_Store
+airflow.db
+logs/
